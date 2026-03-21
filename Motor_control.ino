@@ -73,9 +73,19 @@ void MoveBackwards()
   mc.setSpeed(motorRight, -abs(speed));
 }
 
-void Swerve()
-{
-  
+void Swerve() {
+  unsigned long startTime = millis();
+
+  // Swerve right for 2 seconds
+  while (millis() - startTime < 2000) {
+    mc.setSpeed(motorLeft, speed);      // left motor full speed
+    mc.setSpeed(motorRight, speed / 2); // right motor slower to turn right
+    delay(20);                           // small delay for I2C stability
+  }
+
+  // After 2 seconds, go straight at normal speed
+  mc.setSpeed(motorLeft, speed);
+  mc.setSpeed(motorRight, speed);
 }
 void loop()
 {
