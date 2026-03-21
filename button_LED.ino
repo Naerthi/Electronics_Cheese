@@ -1,7 +1,6 @@
 const int BUTTON = 2;
 const int LED = 3;
-int inPin = 8;         // the number of the input pin
-int outPin = 13;       // the number of the output pin
+
 
 int state = HIGH;      // the current state of the output pin
 int reading;           // the current reading from the input pin
@@ -14,30 +13,31 @@ unsigned long debounce = 200UL;   // the debounce time, increase if the output f
 
 void setup()
 {
-  pinMode(inPin,  BUTTON);
-  pinMode(outPin, LED);
+  pinMode(BUTTON, INPUT);
+  pinMode(LED, OUTPUT);
 }
 
 void loop()
 {
-  reading = digitalRead(inPin);
+  reading = digitalRead(BUTTON);
 
   // if the input just went from LOW and HIGH and we've waited long enough
   // to ignore any noise on the circuit, toggle the output pin and remember
   // the time
   if (reading == HIGH && previous == LOW && millis() - time > debounce)
   {
-    if (state == HIGH)
+    if (state == HIGH){
       state = LOW;
       digitalWrite(LED, HIGH);
-    else
+    }
+    else{
       state = HIGH;
        digitalWrite(LED, LOW);
-
+    }
     time = millis();
   }
 
-  digitalWrite(outPin, state);
+  digitalWrite(LED, state);
 
   previous = reading;
 }
