@@ -36,4 +36,5 @@ void loop()
 
   digitalWrite(LED, state);
 
-  previo
+ previous = reading;
+}
