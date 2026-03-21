@@ -1,7 +1,6 @@
 const int BUTTON = 2;
 const int LED = 3;
 
-
 int state = HIGH;      // the current state of the output pin
 int reading;           // the current reading from the input pin
 int previous = LOW;    // the previous reading from the input pin
@@ -24,8 +23,7 @@ void loop()
   // if the input just went from LOW and HIGH and we've waited long enough
   // to ignore any noise on the circuit, toggle the output pin and remember
   // the time
-  if (reading == HIGH && previous == LOW && millis() - time > debounce)
-  {
+
     if (state == HIGH){
       state = LOW;
       digitalWrite(LED, HIGH);
@@ -35,9 +33,7 @@ void loop()
        digitalWrite(LED, LOW);
     }
     time = millis();
-  }
 
   digitalWrite(LED, state);
 
-  previous = reading;
-}
+  previo
