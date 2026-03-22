@@ -144,12 +144,26 @@ void avoidObstacle() {
 }
 
 // for rotating the robot until stronger light is found
-void searchForLight() {
-  speed = 200;
+float bestLight = 0;
 
-  // slow rotation
-  mc.setSpeed(motorLeft, speed);
-  mc.setSpeed(motorRight, -speed);
+void searchForLight() {
+  bestLight = 0;
+
+  for (int i = 0; i < 8; i++) {
+    TurnRight();
+    delay(150);   // small rotation step
+
+    StopMotors();
+    delay(50);
+    
+    float currentLight = readLight();
+    
+    if (currentLight > bestLight) {
+      bestLight = currentLight;
+    }
+  }
+  // After scanning, move forward
+  MoveForward();
 }
 
 void moveTowardLight(float lightValue) {
