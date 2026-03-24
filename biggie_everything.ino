@@ -136,43 +136,24 @@ unsigned long lastNotification = 0;
 unsigned long notificationInterval = 5000;
 
 void loop() {
-  imu.read();
+  double mag_acc, mag_grav;
 
-  double mag_acc = sqrt(pow(imu.a.x, 2) + pow(imu.a.y, 2) + pow(imu.a.z, 2));
+  readIMU(mag_acc, mag_grav);
 
-  double mag_grav =  sqrt(pow(imu.g.y, 2) + pow(imu.g.z, 2));
   Serial.print("Acceleration Magnitude: ");
   Serial.println(mag_acc);
   Serial.print("Tilt Magnitude: ");
   Serial.println(mag_grav);
   
-  if (mag_acc > 33000 & mag_grav > 40000) {
-    Serial.println("HELP TRIGGERED");
-
-    sendNotification(notifications[15]); // HELP notification
-    Swerve();
-    delay(500); // small debounce so it doesn't spam
-    lastNotification = millis();
-    notificationInterval = random(5000,7000);
+  if (checkForHelp(mag_acc, mag_grav)) {
     return;
   }
 
   if (millis() - lastNotification >= notificationInterval) {
-
-    int index = random(0, 15);
-
-    Serial.print("Sending sound: ");
-    Serial.println(index);
-
-    sendNotification(notifications[index]);
-
-    lastNotification = millis();
-
-    notificationInterval = random(5000, 7000);
+    playRandomNotification();
   }
 
   on = button_on();
-
   if (!on) return;
 
   float distance = getFilteredDistance();
@@ -340,6 +321,42 @@ float readLight() {
   int raw = analogRead(ldrPin);
   float voltage = raw * (5.0 / 1023.0);
   return voltage * 10;
+}
+
+// IMU
+void readIMU(double &mag_acc, double &mag_grav) {
+  imu.read();
+
+  mag_acc = sqrt(pow(imu.a.x, 2) + pow(imu.a.y, 2) + pow(imu.a.z, 2));
+  mag_grav = sqrt(pow(imu.g.y, 2) + pow(imu.g.z, 2));
+}
+
+bool checkForHelp(double mag_acc, double mag_grav) {
+  if (mag_acc > 33000 && mag_grav > 40000) {
+    Serial.println("HELP TRIGGERED");
+
+    sendNotification(notifications[15]); // HELP
+    Swerve();
+
+    delay(500); // debounce
+    lastNotification = millis();
+    notificationInterval = random(5000, 7000);
+
+    return true; // signal that HELP was triggered
+  }
+  return false;
+}
+
+void playRandomNotification() {
+  int index = random(0, 15);
+
+  Serial.print("Sending sound: ");
+  Serial.println(index);
+
+  sendNotification(notifications[index]);
+
+  lastNotification = millis();
+  notificationInterval = random(5000, 7000);
 }
 
 // BUTTON - ON/OFF
