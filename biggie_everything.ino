@@ -258,6 +258,7 @@ void avoidObstacle() {
 
 // for rotating the robot until stronger light is found
 float bestLight = 0;
+int bestIndex = 0;
 
 void searchForLight() {
   bestLight = 0;
@@ -273,7 +274,15 @@ void searchForLight() {
     
     if (currentLight > bestLight) {
       bestLight = currentLight;
+      bestIndex = i;
     }
+
+
+  }
+
+  for (int j = 0; j < (8 - bestIndex); j++) {
+    TurnRight();
+    delay(150);
   }
   // After scanning, move forward
   MoveForward();
@@ -282,7 +291,7 @@ void searchForLight() {
 void moveTowardLight(float lightValue) {
 
   speed = motor_control(lightValue);
-  speed = constrain(speed, 150, maxSpeed);
+  speed = constrain(speed, 0, maxSpeed);
 
   MoveForward();
 }
