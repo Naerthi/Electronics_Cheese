@@ -78,6 +78,7 @@ void setup() {
   Wire.begin();
   Serial.begin(115200);
   matrix.begin();
+  imu.init();
 
   mc.reinitialize();    
   mc.disableCrc();      
