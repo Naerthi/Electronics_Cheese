@@ -1,0 +1,217 @@
+#include <Motoron.h>
+#include <WiFiS3.h>
+#include <Wire.h>
+#include <LSM6.h>
+#include <math.h>
+
+// -------- WIFI --------
+char ssid[] = "zilin";
+char pass[] = "watermelon";
+
+WiFiSSLClient client;
+char HOST_NAME[] = "api.pushcut.io";
+const int port = 443;
+
+// -------- IMU --------
+LSM6 imu;
+
+// -------- MOTOR --------
+MotoronI2C mc(0x10);
+const int motorLeft = 1;
+const int motorRight = 2;
+
+int speed = 300;
+const int maxSpeed = 800;
+
+// -------- SENSORS --------
+const int distancePin = A2;
+const int ldrPin = A0;
+
+// -------- THRESHOLDS --------
+const float obstacleThreshold = 4.0;
+const float lightThreshold = 25.0;
+
+// -------- TIMING --------
+unsigned long lastNotification = 0;
+unsigned long notificationInterval = 5000;
+
+// -------- NOTIFICATIONS --------
+String notifications[] = {
+  "/XqclO3hK_CIauvfDO63QQ/notifications/CHEESE",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/Easy-Peasy",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/Frenchie",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/Good-God-Man",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/Hey-Baby",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/Hmm-Cheese",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/Holy-Macaroni",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/I-Feel-Grate",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/I-Forgot",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/I-Gorgonzola",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/Ain't-Easy",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/Feta-Up",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/Moo-FAHH",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/Mr-Bombastic",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/Cheese-Touch",
+  "/XqclO3hK_CIauvfDO63QQ/notifications/HELP"
+};
+
+// -------- SETUP --------
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();
+
+  // IMU init FIRST (important)
+  if (!imu.init()) {
+    Serial.println("IMU FAIL");
+    while (1);
+  }
+  imu.enableDefault();
+
+  // Motor setup
+  mc.reinitialize();
+  mc.disableCrc();
+  mc.clearResetFlag();
+
+  // WiFi
+  WiFi.begin(ssid, pass);
+  Serial.print("Connecting");
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  Serial.println("\nWiFi ready");
+}
+
+// -------- LOOP --------
+void loop() {
+
+  // ===== IMU =====
+  imu.read();
+
+  double mag_acc = sqrt(imu.a.x * imu.a.x + imu.a.y * imu.a.y + imu.a.z * imu.a.z);
+  double mag_gyro = sqrt(imu.g.x * imu.g.x + imu.g.y * imu.g.y + imu.g.z * imu.g.z);
+
+  Serial.print("ACC: "); Serial.print(mag_acc);
+  Serial.print(" | GYRO: "); Serial.println(mag_gyro);
+
+  // ===== CRASH DETECTION =====
+  if (mag_acc > 20000 && mag_gyro > 20000) {
+    Serial.println("CRASH!");
+
+    sendNotification(notifications[15]);
+
+    // simple swerve (non-looping)
+    mc.setSpeed(motorLeft, 500);
+    mc.setSpeed(motorRight, 250);
+    delay(500);
+
+    lastNotification = millis();
+    return;
+  }
+
+  // ===== RANDOM SOUND =====
+  if (millis() - lastNotification > notificationInterval) {
+    int index = random(0, 15);
+    sendNotification(notifications[index]);
+
+    lastNotification = millis();
+    notificationInterval = random(5000, 7000);
+  }
+
+  // ===== SENSORS =====
+  float distance = getDistance();
+  float light = readLight();
+
+  Serial.print("Dist: "); Serial.print(distance);
+  Serial.print(" | Light: "); Serial.println(light);
+
+  // ===== BEHAVIOUR =====
+  if (distance < obstacleThreshold) {
+    avoidObstacle();
+  }
+  else if (light < lightThreshold) {
+    searchForLight();
+  }
+  else {
+    moveTowardLight(light);
+  }
+
+  delay(50);
+}
+
+// -------- MOVEMENT --------
+void MoveForward(int s) {
+  mc.setSpeed(motorLeft, s);
+  mc.setSpeed(motorRight, s);
+}
+
+void TurnLeft(int s) {
+  mc.setSpeed(motorLeft, -s);
+  mc.setSpeed(motorRight, s);
+}
+
+void TurnRight(int s) {
+  mc.setSpeed(motorLeft, s);
+  mc.setSpeed(motorRight, -s);
+}
+
+void StopMotors() {
+  mc.setSpeed(motorLeft, 0);
+  mc.setSpeed(motorRight, 0);
+}
+
+// -------- BEHAVIOURS --------
+void avoidObstacle() {
+  StopMotors();
+  delay(100);
+
+  if (random(0, 2) == 0) TurnLeft(400);
+  else TurnRight(400);
+
+  delay(300);
+}
+
+void searchForLight() {
+  TurnRight(300);
+  delay(100);
+}
+
+void moveTowardLight(float lightValue) {
+  int s = motor_control(lightValue);
+  s = constrain(s, 200, maxSpeed);
+  MoveForward(s);
+}
+
+// -------- SENSORS --------
+float getDistance() {
+  int raw = analogRead(distancePin);
+  float voltage = raw * (5.0 / 1023.0);
+  return voltage * 10; // simplified for now
+}
+
+float readLight() {
+  int raw = analogRead(ldrPin);
+  float voltage = raw * (5.0 / 1023.0);
+  return voltage * 10;
+}
+
+// -------- MOTOR CONTROL --------
+int motor_control(float voltage) {
+  float computed = maxSpeed * (voltage / 60.0);
+  return (int)computed;
+}
+
+// -------- WIFI --------
+void sendNotification(String path) {
+  if (!client.connect(HOST_NAME, port)) return;
+
+  client.println("GET " + path + " HTTP/1.1");
+  client.println("Host: " + String(HOST_NAME));
+  client.println("Connection: close");
+  client.println();
+
+  delay(50);
+  client.stop();
+}
